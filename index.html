@@ -36,16 +36,20 @@
             text-align: center;
         }
 
+        td.miss {
+            color: var(--miss-color);
+        }
+
+        td.hit {
+            color: var(--hit-color);
+        }
+
+        td.sunk {
+            color: var(--sunk-color);
+        }
+
         td:nth-child(1) {
             font-weight: bold;
-        }
-
-        td:not(:first-child) {
-            border: 2px solid transparent;
-        }
-
-        td:not(:first-child):hover {
-            border: 2px solid #d0d0d0;
         }
 
         ::selection {
