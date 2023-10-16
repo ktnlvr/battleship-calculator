@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="initial-scale=1.0">
+    <title>Battleships Calculator</title>
+    <!--https://lospec.com/palette-list/jr-16-->
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Source+Code+Pro:wght@500;700&display=swap');
+
+        :root {
+            --bg-color: #f5fffd;
+            --text-color: #040404;
+
+            --miss-color: #a2a2ac;
+            --hit-color: #d76f6c;
+            --sunk-color: #7a3820;
+
+            background-color: var(--bg-color);
+            color: var(--text-color);
+        }
+
+        main {
+            font-size: 16pt;
+            margin: 10% 20% 20% 20%;
+            font-family: 'Source Code Pro', monospace;
+        }
+    </style>
+    <noscript>
+        <style>
+            main {
+                content: "Whoops!";
+            }
+        </style>
+    </noscript>
+</head>
+
+<body>
+    <main>
+        <h1>Battleships Calculator</h1>
+        This calculator uses the possible placements of the ships to determine where most ships would overlap thus
+        giving a heatmap of viable strike options. Click on a cell to mark it as a <b
+            style="color: var(--miss-color)">MISS</b>, <b style="color: var(--hit-color)">HIT</b> or
+        <b style="color: var(--sunk-color)"">SUNK</b>. A miss constitutes a cell that has no ships going through it, a hit is a cell that can't have
+        neighbours on the diagonals and a sunken cell doesn't have neighbours at all. All of the above is accounted when
+        calculating the chances. Try it yourselves!
+
+        <table id="grid">
+
+        </table>
+    </main>
+</body>
+
+</html>
