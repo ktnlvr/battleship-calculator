@@ -1,44 +1,20 @@
-use std::{
-    fmt::{Display, Write},
-    num::NonZeroUsize,
-    sync::Mutex,
-};
+use std::{num::NonZeroUsize, sync::Mutex};
 
 use lazy_static::lazy_static;
 use log::Level;
+use url::Url;
 use wasm_bindgen::prelude::*;
 use web_sys::*;
 
-#[derive(Debug, Default, Clone, Copy, Hash, PartialEq, Eq)]
-pub enum CellState {
-    #[default]
-    EMPTY,
-    MISS,
-    HIT,
-    SUNK,
-}
-
-impl Display for CellState {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            CellState::EMPTY => f.write_char(' '),
-            CellState::MISS => f.write_char('o'),
-            CellState::HIT => f.write_char('x'),
-            CellState::SUNK => f.write_char('X'),
-        }
-    }
-}
-
-pub struct GridState {
-    pub cells: Vec<Vec<CellState>>,
-}
+mod brain;
+use brain::*;
 
 lazy_static! {
     pub static ref GRID: Mutex<GridState> = Mutex::new(GridState { cells: vec![] });
 }
 
 pub fn get_document() -> Document {
-    web_sys::window()
+    window()
         .expect("Couldn't get the window")
         .document()
         .expect("Couldn't get the document")
@@ -127,7 +103,7 @@ pub fn configure_cell(cell: &Element, x: usize, y: usize) -> Result<(), JsValue>
             cell.set_text_content(Some(&format!("{cell_value}")));
         }
 
-        display_chances(recalculate_chances());
+        refresh();
     }) as Box<dyn FnMut()>);
 
     cell.add_event_listener_with_callback("click", cell_click_closure.as_ref().unchecked_ref())?;
@@ -136,76 +112,12 @@ pub fn configure_cell(cell: &Element, x: usize, y: usize) -> Result<(), JsValue>
     Ok(())
 }
 
-pub fn recalculate_chances() -> Vec<Vec<usize>> {
+pub fn refresh() {
     let inputs = get_inputs();
-    let n = inputs.grid_size;
 
-    let mut chances = vec![vec![0usize; inputs.grid_size]; inputs.grid_size];
-    let mut mask = vec![vec![true; inputs.grid_size]; inputs.grid_size];
+    let chances = calculate_chances(&GRID.lock().unwrap().cells, inputs.grid_size, &inputs.ships);
 
-    let grid = &GRID.lock().unwrap().cells;
-
-    for i in 0..n {
-        for j in 0..n {
-            match grid[i][j] {
-                CellState::EMPTY => {}
-                CellState::MISS => mask[i][j] = false,
-                CellState::HIT => {
-                    for (x, y) in [(1, 1), (1, -1), (-1, -1), (-1, 1)] {
-                        let (ix, x_overflow) = i.overflowing_add_signed(x);
-                        let (jy, y_overflow) = j.overflowing_add_signed(y);
-
-                        if x_overflow || y_overflow || ix == n || jy == n {
-                            continue;
-                        }
-
-                        mask[ix][jy] = false;
-                    }
-                }
-                CellState::SUNK => {
-                    for (x, y) in [
-                        (0, 0),
-                        (0, 1),
-                        (1, 0),
-                        (0, -1),
-                        (-1, 0),
-                        (1, 1),
-                        (1, -1),
-                        (-1, -1),
-                        (-1, 1),
-                    ] {
-                        let (ix, x_overflow) = i.overflowing_add_signed(x);
-                        let (iy, y_overflow) = j.overflowing_add_signed(y);
-                        if x_overflow || y_overflow || ix == n || iy == n {
-                            continue;
-                        }
-
-                        mask[ix][iy] = false;
-                    }
-                }
-            }
-        }
-    }
-
-    for s in inputs.ships {
-        if s > n {
-            continue;
-        }
-
-        for i in 0..n {
-            for j in 0..(n - s + 1) {
-                if mask[i][j..(j + s)].iter().all(|b| *b) {
-                    chances[i][j..(j + s)].iter_mut().for_each(|x| *x += 1);
-                }
-
-                if mask[j..(j + s)].iter().map(|row| row[i]).all(|x| x) {
-                    chances[j..(j + s)].iter_mut().for_each(|row| row[i] += 1);
-                }
-            }
-        }
-    }
-
-    chances
+    display_chances(chances);
 }
 
 pub fn display_chances(chances: Vec<Vec<usize>>) {
@@ -285,6 +197,18 @@ pub fn start() -> Result<(), JsValue> {
     console_error_panic_hook::set_once();
 
     let document = get_document();
+    let url = Url::parse(&document.url()?).unwrap();
+
+    let grid_size_query_param =
+        url.query_pairs()
+            .find_map(|(param_name, value)| if param_name == "n" { Some(value) } else { None });
+    let ships_query_param = url.query_pairs().find_map(|(param_name, value)| {
+        if param_name == "ships" {
+            Some(value)
+        } else {
+            None
+        }
+    });
 
     let regenerate_grid_closure = Closure::wrap(Box::new(move || {
         let document = get_document();
@@ -301,29 +225,46 @@ pub fn start() -> Result<(), JsValue> {
         grid_parent.append_child(&new_grid).unwrap();
 
         regenerate_grid().unwrap();
-        display_chances(recalculate_chances());
+
+        refresh();
     }) as Box<dyn FnMut()>);
 
-    document
-        .get_element_by_id("ships")
-        .unwrap()
-        .add_event_listener_with_callback(
+    // Ships input
+    {
+        let ships_input = document.get_element_by_id("ships").unwrap();
+
+        ships_input.add_event_listener_with_callback(
             "change",
             regenerate_grid_closure.as_ref().unchecked_ref(),
         )?;
 
-    document
-        .get_element_by_id("grid-size")
-        .unwrap()
-        .add_event_listener_with_callback(
+        if let Some(ships_query_param) = ships_query_param {
+            ships_input
+                .dyn_into::<HtmlInputElement>()?
+                .set_value(&ships_query_param);
+        }
+    }
+
+    // Grid size input
+    {
+        let grid_size_input = document.get_element_by_id("grid-size").unwrap();
+
+        grid_size_input.add_event_listener_with_callback(
             "change",
             regenerate_grid_closure.as_ref().unchecked_ref(),
         )?;
+
+        if let Some(grid_size_query_param) = grid_size_query_param {
+            grid_size_input
+                .dyn_into::<HtmlInputElement>()?
+                .set_value(&grid_size_query_param);
+        }
+    }
 
     regenerate_grid_closure.forget();
 
     regenerate_grid()?;
-    display_chances(recalculate_chances());
+    refresh();
 
     Ok(())
 }

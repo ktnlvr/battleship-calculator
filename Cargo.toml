@@ -8,10 +8,12 @@ console_error_panic_hook = "0.1.7"
 console_log = { version = "1.0.0", features = ["wasm-bindgen"] }
 lazy_static = "1.4.0"
 log = "0.4.20"
+url = "2.4.1"
 wasm-bindgen = { version = "0.2.87" }
 web-sys = { version = "0.3.64", features = [
     "Window",
     "Document",
     "Element",
     "HtmlInputElement",
+    "Url",
 ] }
