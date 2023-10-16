@@ -1,3 +1,8 @@
+#![feature(generators)]
+#![feature(generator_trait)]
+#![feature(iter_from_generator)]
+#![feature(impl_trait_in_fn_trait_return)]
+
 use std::{num::NonZeroUsize, sync::Mutex};
 
 use lazy_static::lazy_static;
@@ -72,7 +77,7 @@ fn name_from_number(n: usize) -> String {
     }
 }
 
-pub fn configure_cell(cell: &Element, x: usize, y: usize) -> Result<(), JsValue> {
+pub fn setup_cell(cell: &Element, x: usize, y: usize) -> Result<(), JsValue> {
     cell.set_text_content(None);
     cell.set_class_name("");
 
@@ -80,27 +85,49 @@ pub fn configure_cell(cell: &Element, x: usize, y: usize) -> Result<(), JsValue>
     cell.set_id(&id);
 
     let cell_click_closure = Closure::wrap(Box::new(move || {
-        let doc = get_document();
-        let cell = doc.get_element_by_id(&id).unwrap();
-
         {
-            let cell_value = &mut GRID.lock().unwrap().cells[x][y];
+            let cells = &mut GRID.lock().unwrap().cells;
 
-            *cell_value = match *cell_value {
+            let new_value = match cells[x][y] {
                 CellState::EMPTY => CellState::MISS,
                 CellState::MISS => CellState::HIT,
-                CellState::HIT => CellState::SUNK,
-                CellState::SUNK => CellState::EMPTY,
+                CellState::HIT => {
+                    let grid_size = get_inputs().grid_size;
+
+                    let mut near_queue = vec![(x, y)];
+                    while let Some((x, y)) = near_queue.pop() {
+                        for (x, y) in
+                            std::iter::from_generator(get_neumann_neighbors(grid_size, x, y))
+                        {
+                            if cells[x][y] == CellState::HIT {
+                                cells[x][y] = CellState::SUNK;
+                                near_queue.push((x, y))
+                            }
+                        }
+                    }
+
+                    CellState::SUNK
+                }
+                CellState::SUNK => {
+                    let grid_size = get_inputs().grid_size;
+
+                    let mut near_queue = vec![(x, y)];
+                    while let Some((x, y)) = near_queue.pop() {
+                        for (x, y) in
+                            std::iter::from_generator(get_neumann_neighbors(grid_size, x, y))
+                        {
+                            if cells[x][y] == CellState::SUNK {
+                                cells[x][y] = CellState::HIT;
+                                near_queue.push((x, y))
+                            }
+                        }
+                    }
+
+                    CellState::EMPTY
+                }
             };
 
-            match *cell_value {
-                CellState::EMPTY => cell.set_class_name(""),
-                CellState::MISS => cell.set_class_name("miss"),
-                CellState::HIT => cell.set_class_name("hit"),
-                CellState::SUNK => cell.set_class_name("sunk"),
-            }
-
-            cell.set_text_content(Some(&format!("{cell_value}")));
+            cells[x][y] = new_value;
         }
 
         refresh();
@@ -132,13 +159,22 @@ pub fn display_chances(chances: Vec<Vec<usize>>) {
         .copied()
         .unwrap_or_default();
 
+    let cells = &mut GRID.lock().unwrap().cells;
     for (i, row) in chances.iter().enumerate() {
         for (j, chance) in row.iter().enumerate().take(inputs.grid_size) {
             let cell = document
                 .get_element_by_id(&format!("{i}x{j}"))
                 .expect("Could not find a grip element at expected index!");
 
-            if GRID.lock().unwrap().cells[i][j] != CellState::EMPTY {
+            if cells[i][j] != CellState::EMPTY {
+                cell.set_text_content(Some(&format!("{}", cells[i][j])));
+                match cells[i][j] {
+                    CellState::EMPTY => cell.set_class_name(""),
+                    CellState::MISS => cell.set_class_name("miss"),
+                    CellState::HIT => cell.set_class_name("hit"),
+                    CellState::SUNK => cell.set_class_name("sunk"),
+                }
+
                 continue;
             }
 
@@ -148,7 +184,11 @@ pub fn display_chances(chances: Vec<Vec<usize>>) {
                 cell.set_class_name("");
             }
 
-            cell.set_text_content(Some(&format!("{}", chance)))
+            if *chance == 0 {
+                cell.set_text_content(Some(""));
+            } else {
+                cell.set_text_content(Some(&format!("{}", chance)));
+            }
         }
     }
 }
@@ -181,7 +221,7 @@ pub fn regenerate_grid() -> Result<(), JsValue> {
 
         for j in 0..inputs.grid_size {
             let cell = document.create_element("td")?;
-            configure_cell(&cell, i, j)?;
+            setup_cell(&cell, i, j)?;
             grid_row.append_child(&cell)?;
         }
 
@@ -225,10 +265,27 @@ pub fn start() -> Result<(), JsValue> {
         grid_parent.append_child(&new_grid).unwrap();
 
         let inputs = get_inputs();
-        let ships_str = inputs.ships.iter().map(|x| format!("{x}")).collect::<Vec<_>>().join(" ");
+        let ships_str = inputs
+            .ships
+            .iter()
+            .map(|x| format!("{x}"))
+            .collect::<Vec<_>>()
+            .join(" ");
         let url = window().unwrap().origin();
 
-        window().unwrap().history().unwrap().replace_state_with_url(&JsValue::UNDEFINED, "!!!", Some(&format!("{}?n={}&ships={}", url, inputs.grid_size, ships_str))).unwrap();
+        window()
+            .unwrap()
+            .history()
+            .unwrap()
+            .replace_state_with_url(
+                &JsValue::UNDEFINED,
+                "!!!",
+                Some(&format!(
+                    "{}?n={}&ships={}",
+                    url, inputs.grid_size, ships_str
+                )),
+            )
+            .unwrap();
         regenerate_grid().unwrap();
 
         refresh();

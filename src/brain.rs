@@ -1,4 +1,7 @@
-use std::fmt::{Display, Write};
+use std::{
+    fmt::{Display, Write},
+    ops::Generator,
+};
 
 #[derive(Debug, Default, Clone, Copy, Hash, PartialEq, Eq)]
 pub enum CellState {
@@ -24,6 +27,66 @@ pub struct GridState {
     pub cells: Vec<Vec<CellState>>,
 }
 
+const DIAGONAL_NEIGHBORHOOD: [(isize, isize); 4] = [(1, 1), (1, -1), (-1, -1), (-1, 1)];
+
+fn neighbors(
+    neighborhood: &'static [(isize, isize)],
+    grid_size: usize,
+    i: usize,
+    j: usize,
+) -> impl Generator<Yield = (usize, usize), Return = ()> {
+    let n = grid_size;
+    move || {
+        for (x, y) in neighborhood {
+            let (ix, x_overflow) = i.overflowing_add_signed(*x);
+            let (jy, y_overflow) = j.overflowing_add_signed(*y);
+
+            if x_overflow || y_overflow || ix == n || jy == n {
+                continue;
+            }
+
+            yield (ix, jy);
+        }
+    }
+}
+
+pub fn get_diagonal_neighbours(
+    n: usize,
+    i: usize,
+    j: usize,
+) -> impl Generator<Yield = (usize, usize), Return = ()> {
+    neighbors(&DIAGONAL_NEIGHBORHOOD, n, i, j)
+}
+
+const MOORE_NEIGHBORHOOD: [(isize, isize); 8] = [
+    (0, 1),
+    (1, 0),
+    (0, -1),
+    (-1, 0),
+    (1, 1),
+    (1, -1),
+    (-1, -1),
+    (-1, 1),
+];
+
+pub fn get_moore_neighbors(
+    n: usize,
+    i: usize,
+    j: usize,
+) -> impl Generator<Yield = (usize, usize), Return = ()> {
+    neighbors(&MOORE_NEIGHBORHOOD, n, i, j)
+}
+
+const NEUMANN_NEIGHBORHOOD: [(isize, isize); 4] = [(1, 0), (0, 1), (-1, 0), (0, -1)];
+
+pub fn get_neumann_neighbors(
+    n: usize,
+    i: usize,
+    j: usize,
+) -> impl Generator<Yield = (usize, usize), Return = ()> {
+    neighbors(&NEUMANN_NEIGHBORHOOD, n, i, j)
+}
+
 pub fn calculate_chances(
     grid: &Vec<Vec<CellState>>,
     grid_size: usize,
@@ -39,35 +102,13 @@ pub fn calculate_chances(
                 CellState::EMPTY => {}
                 CellState::MISS => mask[i][j] = false,
                 CellState::HIT => {
-                    for (x, y) in [(1, 1), (1, -1), (-1, -1), (-1, 1)] {
-                        let (ix, x_overflow) = i.overflowing_add_signed(x);
-                        let (jy, y_overflow) = j.overflowing_add_signed(y);
-
-                        if x_overflow || y_overflow || ix == n || jy == n {
-                            continue;
-                        }
-
-                        mask[ix][jy] = false;
+                    for (ix, iy) in std::iter::from_generator(get_diagonal_neighbours(n, i, j)) {
+                        mask[ix][iy] = false;
                     }
                 }
                 CellState::SUNK => {
-                    for (x, y) in [
-                        (0, 0),
-                        (0, 1),
-                        (1, 0),
-                        (0, -1),
-                        (-1, 0),
-                        (1, 1),
-                        (1, -1),
-                        (-1, -1),
-                        (-1, 1),
-                    ] {
-                        let (ix, x_overflow) = i.overflowing_add_signed(x);
-                        let (iy, y_overflow) = j.overflowing_add_signed(y);
-                        if x_overflow || y_overflow || ix == n || iy == n {
-                            continue;
-                        }
-
+                    mask[i][j] = false;
+                    for (ix, iy) in std::iter::from_generator(get_moore_neighbors(n, i, j)) {
                         mask[ix][iy] = false;
                     }
                 }
