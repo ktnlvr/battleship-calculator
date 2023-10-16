@@ -5,7 +5,7 @@ use std::{
 };
 
 use lazy_static::lazy_static;
-use log::{debug, info, Level};
+use log::Level;
 use wasm_bindgen::prelude::*;
 use web_sys::*;
 
@@ -58,10 +58,8 @@ pub fn get_inputs() -> Inputs {
         .unwrap()
         .dyn_into::<HtmlInputElement>()
         .ok()
-        .map(|inp| inp.value().parse::<usize>().ok())
-        .flatten()
-        .map(NonZeroUsize::new)
-        .flatten()
+        .and_then(|inp| inp.value().parse::<usize>().ok())
+        .and_then(NonZeroUsize::new)
         .map(NonZeroUsize::get)
         .unwrap_or(10);
 
@@ -70,23 +68,20 @@ pub fn get_inputs() -> Inputs {
         .unwrap()
         .dyn_into::<HtmlInputElement>()
         .ok()
-        .map(|inp| {
+        .and_then(|inp| {
             inp.value()
                 .split_ascii_whitespace()
                 .map(|s| s.parse::<usize>())
                 .collect::<Result<Vec<usize>, _>>()
                 .ok()
         })
-        .flatten()
         .unwrap_or_default();
 
-    let ships = if ships.len() == 0 {
+    let ships = if ships.is_empty() {
         vec![4, 3, 3, 2, 2, 2]
     } else {
         ships
     };
-
-    info!("{:?}", ships);
 
     Inputs { grid_size, ships }
 }
@@ -200,9 +195,7 @@ pub fn recalculate_chances() -> Vec<Vec<usize>> {
         for i in 0..n {
             for j in 0..(n - s + 1) {
                 if mask[i][j..(j + s)].iter().all(|b| *b) {
-                    (&mut chances[i][j..(j + s)])
-                        .iter_mut()
-                        .for_each(|x| *x += 1);
+                    chances[i][j..(j + s)].iter_mut().for_each(|x| *x += 1);
                 }
 
                 if mask[j..(j + s)].iter().map(|row| row[i]).all(|x| x) {
@@ -219,16 +212,16 @@ pub fn display_chances(chances: Vec<Vec<usize>>) {
     let document = get_document();
     let inputs = get_inputs();
 
-    let max_cell = chances
+    let max_cell_chance = chances
         .iter()
         .map(|row| row.iter().max())
         .max()
         .flatten()
-        .map(|max| *max)
+        .copied()
         .unwrap_or_default();
 
-    for i in 0..inputs.grid_size {
-        for j in 0..inputs.grid_size {
+    for (i, row) in chances.iter().enumerate() {
+        for (j, chance) in row.iter().enumerate().take(inputs.grid_size) {
             let cell = document
                 .get_element_by_id(&format!("{i}x{j}"))
                 .expect("Could not find a grip element at expected index!");
@@ -237,13 +230,13 @@ pub fn display_chances(chances: Vec<Vec<usize>>) {
                 continue;
             }
 
-            if chances[i][j] == max_cell {
+            if *chance == max_cell_chance {
                 cell.set_class_name("top-guess");
             } else {
                 cell.set_class_name("");
             }
 
-            cell.set_text_content(Some(&format!("{}", chances[i][j])))
+            cell.set_text_content(Some(&format!("{}", chance)))
         }
     }
 }
@@ -287,11 +280,7 @@ pub fn regenerate_grid() -> Result<(), JsValue> {
 }
 
 #[wasm_bindgen(start)]
-pub fn start() {
-    main().unwrap();
-}
-
-pub fn main() -> Result<(), JsValue> {
+pub fn start() -> Result<(), JsValue> {
     console_log::init_with_level(Level::Debug).unwrap();
     console_error_panic_hook::set_once();
 
@@ -337,4 +326,8 @@ pub fn main() -> Result<(), JsValue> {
     display_chances(recalculate_chances());
 
     Ok(())
+}
+
+pub fn main() {
+    start().unwrap();
 }
