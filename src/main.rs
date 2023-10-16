@@ -1,5 +1,6 @@
 use std::{
     fmt::{Display, Write},
+    num::NonZeroUsize,
     sync::Mutex,
 };
 
@@ -43,13 +44,13 @@ pub fn get_document() -> Document {
         .expect("Couldn't get the document")
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub struct Inputs {
     pub grid_size: usize,
     pub ships: Vec<usize>,
 }
 
-pub fn get_inputs() -> Option<Inputs> {
+pub fn get_inputs() -> Inputs {
     let document = get_document();
 
     let grid_size = document
@@ -58,7 +59,11 @@ pub fn get_inputs() -> Option<Inputs> {
         .dyn_into::<HtmlInputElement>()
         .ok()
         .map(|inp| inp.value().parse::<usize>().ok())
-        .flatten()?;
+        .flatten()
+        .map(NonZeroUsize::new)
+        .flatten()
+        .map(NonZeroUsize::get)
+        .unwrap_or(10);
 
     let ships = document
         .get_element_by_id("ships")
@@ -72,9 +77,18 @@ pub fn get_inputs() -> Option<Inputs> {
                 .collect::<Result<Vec<usize>, _>>()
                 .ok()
         })
-        .flatten()?;
+        .flatten()
+        .unwrap_or_default();
 
-    Some(Inputs { grid_size, ships })
+    let ships = if ships.len() == 0 {
+        vec![4, 3, 3, 2, 2, 2]
+    } else {
+        ships
+    };
+
+    info!("{:?}", ships);
+
+    Inputs { grid_size, ships }
 }
 
 fn name_from_number(n: usize) -> String {
@@ -94,7 +108,7 @@ pub fn configure_cell(cell: &Element, x: usize, y: usize) -> Result<(), JsValue>
     let id = format!("{x}x{y}");
     cell.set_id(&id);
 
-    let f = Closure::wrap(Box::new(move || {
+    let cell_click_closure = Closure::wrap(Box::new(move || {
         let doc = get_document();
         let cell = doc.get_element_by_id(&id).unwrap();
 
@@ -118,19 +132,17 @@ pub fn configure_cell(cell: &Element, x: usize, y: usize) -> Result<(), JsValue>
             cell.set_text_content(Some(&format!("{cell_value}")));
         }
 
-        if let Some(chances) = recalculate_chances() {
-            display_chances(chances);
-        }
+        display_chances(recalculate_chances());
     }) as Box<dyn FnMut()>);
 
-    cell.add_event_listener_with_callback("click", f.as_ref().unchecked_ref())?;
-    f.forget();
+    cell.add_event_listener_with_callback("click", cell_click_closure.as_ref().unchecked_ref())?;
+    cell_click_closure.forget();
 
     Ok(())
 }
 
-pub fn recalculate_chances() -> Option<Vec<Vec<usize>>> {
-    let inputs = get_inputs()?;
+pub fn recalculate_chances() -> Vec<Vec<usize>> {
+    let inputs = get_inputs();
     let n = inputs.grid_size;
 
     let mut chances = vec![vec![0usize; inputs.grid_size]; inputs.grid_size];
@@ -141,7 +153,7 @@ pub fn recalculate_chances() -> Option<Vec<Vec<usize>>> {
     for i in 0..n {
         for j in 0..n {
             match grid[i][j] {
-                CellState::EMPTY => {},
+                CellState::EMPTY => {}
                 CellState::MISS => mask[i][j] = false,
                 CellState::HIT => {
                     for (x, y) in [(1, 1), (1, -1), (-1, -1), (-1, 1)] {
@@ -200,24 +212,36 @@ pub fn recalculate_chances() -> Option<Vec<Vec<usize>>> {
         }
     }
 
-    Some(chances)
+    chances
 }
 
 pub fn display_chances(chances: Vec<Vec<usize>>) {
     let document = get_document();
-    let Some(inputs) = get_inputs() else {
-        return;
-    };
+    let inputs = get_inputs();
+
+    let max_cell = chances
+        .iter()
+        .map(|row| row.iter().max())
+        .max()
+        .flatten()
+        .map(|max| *max)
+        .unwrap_or_default();
 
     for i in 0..inputs.grid_size {
         for j in 0..inputs.grid_size {
+            let cell = document
+                .get_element_by_id(&format!("{i}x{j}"))
+                .expect("Could not find a grip element at expected index!");
+
             if GRID.lock().unwrap().cells[i][j] != CellState::EMPTY {
                 continue;
             }
 
-            let cell = document
-                .get_element_by_id(&format!("{i}x{j}"))
-                .expect("Could not find a grip element at expected index!");
+            if chances[i][j] == max_cell {
+                cell.set_class_name("top-guess");
+            } else {
+                cell.set_class_name("");
+            }
 
             cell.set_text_content(Some(&format!("{}", chances[i][j])))
         }
@@ -229,10 +253,7 @@ pub fn regenerate_grid() -> Result<(), JsValue> {
     let grid = document
         .get_element_by_id("grid")
         .expect("Couldn't get grid");
-
-    let Some(inputs) = get_inputs() else {
-        return Ok(());
-    };
+    let inputs = get_inputs();
 
     GRID.lock().unwrap().cells = vec![vec![CellState::EMPTY; inputs.grid_size]; inputs.grid_size];
 
@@ -274,10 +295,46 @@ pub fn main() -> Result<(), JsValue> {
     console_log::init_with_level(Level::Debug).unwrap();
     console_error_panic_hook::set_once();
 
+    let document = get_document();
+
+    let regenerate_grid_closure = Closure::wrap(Box::new(move || {
+        let document = get_document();
+
+        let grid = document
+            .get_element_by_id("grid")
+            .expect("Couldn't get grid");
+
+        let grid_parent = grid.parent_element().unwrap();
+        grid.remove();
+
+        let new_grid = document.create_element("table").unwrap();
+        new_grid.set_id("grid");
+        grid_parent.append_child(&new_grid).unwrap();
+
+        regenerate_grid().unwrap();
+        display_chances(recalculate_chances());
+    }) as Box<dyn FnMut()>);
+
+    document
+        .get_element_by_id("ships")
+        .unwrap()
+        .add_event_listener_with_callback(
+            "change",
+            regenerate_grid_closure.as_ref().unchecked_ref(),
+        )?;
+
+    document
+        .get_element_by_id("grid-size")
+        .unwrap()
+        .add_event_listener_with_callback(
+            "change",
+            regenerate_grid_closure.as_ref().unchecked_ref(),
+        )?;
+
+    regenerate_grid_closure.forget();
+
     regenerate_grid()?;
-    if let Some(chances) = recalculate_chances() {
-        display_chances(chances);
-    }
+    display_chances(recalculate_chances());
 
     Ok(())
 }
