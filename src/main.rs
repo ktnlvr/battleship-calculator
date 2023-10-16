@@ -210,7 +210,7 @@ pub fn start() -> Result<(), JsValue> {
         }
     });
 
-    let regenerate_grid_closure = Closure::wrap(Box::new(move || {
+    let react_to_input_change_closure = Closure::wrap(Box::new(move || {
         let document = get_document();
 
         let grid = document
@@ -224,6 +224,11 @@ pub fn start() -> Result<(), JsValue> {
         new_grid.set_id("grid");
         grid_parent.append_child(&new_grid).unwrap();
 
+        let inputs = get_inputs();
+        let ships_str = inputs.ships.iter().map(|x| format!("{x}")).collect::<Vec<_>>().join(" ");
+        let url = window().unwrap().origin();
+
+        window().unwrap().history().unwrap().replace_state_with_url(&JsValue::UNDEFINED, "!!!", Some(&format!("{}?n={}&ships={}", url, inputs.grid_size, ships_str))).unwrap();
         regenerate_grid().unwrap();
 
         refresh();
@@ -235,7 +240,7 @@ pub fn start() -> Result<(), JsValue> {
 
         ships_input.add_event_listener_with_callback(
             "change",
-            regenerate_grid_closure.as_ref().unchecked_ref(),
+            react_to_input_change_closure.as_ref().unchecked_ref(),
         )?;
 
         if let Some(ships_query_param) = ships_query_param {
@@ -251,7 +256,7 @@ pub fn start() -> Result<(), JsValue> {
 
         grid_size_input.add_event_listener_with_callback(
             "change",
-            regenerate_grid_closure.as_ref().unchecked_ref(),
+            react_to_input_change_closure.as_ref().unchecked_ref(),
         )?;
 
         if let Some(grid_size_query_param) = grid_size_query_param {
@@ -261,7 +266,7 @@ pub fn start() -> Result<(), JsValue> {
         }
     }
 
-    regenerate_grid_closure.forget();
+    react_to_input_change_closure.forget();
 
     regenerate_grid()?;
     refresh();

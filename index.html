@@ -3,7 +3,7 @@
 
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=0.5">
     <title>Battleships Calculator</title>
     <!-- https://lospec.com/palette-list/microsoft-windows -->
     <style>
@@ -24,6 +24,31 @@
 
             background-color: var(--bg-color);
             color: var(--text-color);
+            font-size: 16pt;
+            font-family: 'Source Code Pro', monospace;
+            touch-action: manipulation;
+        }
+
+        @media (min-width: 1080px) {
+            main {
+                margin: 15%;
+            }
+        }
+
+        @media (max-width: 1080px) {
+            main {
+                margin: 1%;
+            }
+        }
+
+        input {
+            all: unset;
+            color: var(--input-color);
+        }
+
+        input::placeholder {
+            all: unset;
+            color: var(--input-placeholder-color);
         }
 
         td,
@@ -31,6 +56,7 @@
             -webkit-user-select: none;
             -moz-user-select: none;
             -ms-user-select: none;
+            aspect-ratio: 1;
             user-select: none;
             width: 60px;
             height: 60px;
@@ -53,6 +79,7 @@
         }
 
         td:nth-child(1) {
+            width: 10px;
             font-weight: bold;
         }
 
@@ -71,22 +98,6 @@
 
         td.top-guess {
             border: 4px solid var(--best-guess-color);
-        }
-
-        main {
-            font-size: 16pt;
-            margin: 5% 25% 25% 25%;
-            font-family: 'Source Code Pro', monospace;
-        }
-
-        input {
-            all: unset;
-            color: var(--input-color);
-        }
-
-        input::placeholder {
-            all: unset;
-            color: var(--input-placeholder-color);
         }
     </style>
     <noscript>
@@ -107,16 +118,14 @@
         <b style="color: var(--sunk-color)"">SUNK</b>. A miss constitutes a cell that has no ships going through it, a hit is a cell that can't have
         neighbours on the diagonals and a sunken cell doesn't have neighbours at all. All of the above is accounted when
         calculating the chances.
-
         <div class=" board-config">
             Grid Size: <input id="grid-size" placeholder="10"><br>
             Ships: <input id="ships" placeholder="4 3 3 2 2 2">
             </div>
-
             <table id="grid">
-
             </table>
     </main>
+
 </body>
 
 </html>
