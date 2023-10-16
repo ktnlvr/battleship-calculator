@@ -5,26 +5,72 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="initial-scale=1.0">
     <title>Battleships Calculator</title>
-    <!--https://lospec.com/palette-list/jr-16-->
+    <!-- https://lospec.com/palette-list/microsoft-windows -->
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Source+Code+Pro:wght@500;700&display=swap');
 
         :root {
-            --bg-color: #f5fffd;
-            --text-color: #040404;
+            --bg-color: #ffffff;
+            --text-color: #000000;
 
-            --miss-color: #a2a2ac;
-            --hit-color: #d76f6c;
-            --sunk-color: #7a3820;
+            --miss-color: #7e7e7e;
+            --hit-color: #fe0000;
+            --sunk-color: #7e0000;
+
+            --input-color: #0000ff;
+            --input-bg-color: #00007e;
+            --input-placeholder-color: #7e7e7e;
 
             background-color: var(--bg-color);
             color: var(--text-color);
         }
 
+        td,
+        th {
+            -webkit-user-select: none;
+            -moz-user-select: none;
+            -ms-user-select: none;
+            user-select: none;
+            width: 60px;
+            height: 60px;
+            text-align: center;
+        }
+
+        td:nth-child(1) {
+            font-weight: bold;
+        }
+
+        td:not(:first-child) {
+            border: 2px solid transparent;
+        }
+
+        td:not(:first-child):hover {
+            border: 2px solid #d0d0d0;
+        }
+
+        ::selection {
+            background-color: #bebebe;
+        }
+
+        .board-config {
+            padding-top: 25px;
+            padding-bottom: 25px;
+        }
+
         main {
             font-size: 16pt;
-            margin: 10% 20% 20% 20%;
+            margin: 5% 25% 25% 25%;
             font-family: 'Source Code Pro', monospace;
+        }
+
+        input {
+            all: unset;
+            color: var(--input-color);
+        }
+
+        input::placeholder {
+            all: unset;
+            color: var(--input-placeholder-color);
         }
     </style>
     <noscript>
@@ -44,11 +90,16 @@
             style="color: var(--miss-color)">MISS</b>, <b style="color: var(--hit-color)">HIT</b> or
         <b style="color: var(--sunk-color)"">SUNK</b>. A miss constitutes a cell that has no ships going through it, a hit is a cell that can't have
         neighbours on the diagonals and a sunken cell doesn't have neighbours at all. All of the above is accounted when
-        calculating the chances. Try it yourselves!
+        calculating the chances.
 
-        <table id="grid">
+        <div class=" board-config">
+            Grid Size: <input id="grid-size" placeholder="10"><br>
+            Ships: <input id="ships" placeholder="4 3 3 2 2 2">
+            </div>
 
-        </table>
+            <table id="grid">
+
+            </table>
     </main>
 </body>
 

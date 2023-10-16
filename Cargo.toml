@@ -4,4 +4,13 @@ version = "0.0.0"
 edition = "2021"
 
 [dependencies]
-wasm-bindgen = "0.2.87"
+console_error_panic_hook = "0.1.7"
+console_log = { version = "1.0.0", features = ["wasm-bindgen"] }
+log = "0.4.20"
+wasm-bindgen = { version = "0.2.87" }
+web-sys = { version = "0.3.64", features = [
+    "Window",
+    "Document",
+    "Element",
+    "HtmlInputElement",
+] }
