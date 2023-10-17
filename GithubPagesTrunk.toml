@@ -1,0 +1,6 @@
+[build]
+release = true
+dist = "dist"
+public_url = "https://ktnlvr.github.io/battleships/"
+filehash = false
+inject_scripts = true
