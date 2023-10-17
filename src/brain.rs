@@ -1,7 +1,11 @@
 use std::{
+    collections::HashSet,
     fmt::{Display, Write},
+    iter::from_generator,
     ops::Generator,
 };
+
+use log::info;
 
 #[derive(Debug, Default, Clone, Copy, Hash, PartialEq, Eq)]
 pub enum CellState {
@@ -87,6 +91,45 @@ pub fn get_neumann_neighbors(
     neighbors(&NEUMANN_NEIGHBORHOOD, n, i, j)
 }
 
+pub fn extract_sunken_ships(grid: &Vec<Vec<CellState>>, grid_size: usize) -> Vec<usize> {
+    let n = grid_size;
+
+    let mut sunk = vec![];
+    let mut near_queue = vec![(0, 0)];
+    let mut visited = HashSet::new();
+
+    while let Some((x, y)) = near_queue.pop() {
+        if visited.contains(&(x, y)) {
+            continue;
+        }
+
+        if grid[x][y] == CellState::SUNK {
+            let mut this_connectedness = vec![];
+            let mut sunken = vec![(x, y)];
+            while let Some((i, j)) = sunken.pop() {
+                if this_connectedness.contains(&(i, j)) {
+                    continue;
+                }
+
+                sunken.extend(
+                    from_generator(get_neumann_neighbors(n, i, j))
+                        .filter(|&(x, y)| grid[x][y] == CellState::SUNK),
+                );
+                this_connectedness.push((i, j));
+            }
+
+            sunk.push(this_connectedness.len());
+            visited.extend(this_connectedness);
+        } else {
+            visited.insert((x, y));
+        }
+
+        near_queue.extend(from_generator(get_neumann_neighbors(n, x, y)))
+    }
+
+    sunk
+}
+
 pub fn calculate_chances(
     grid: &Vec<Vec<CellState>>,
     grid_size: usize,
@@ -94,22 +137,32 @@ pub fn calculate_chances(
 ) -> Vec<Vec<usize>> {
     let n = grid_size;
     let mut chances = vec![vec![0usize; n]; n];
-    let mut mask = vec![vec![true; n]; n];
+    let mut ship_may_be_here = vec![vec![true; n]; n];
+    let ships = {
+        let mut ships = ships.clone();
+        for sunken_size in extract_sunken_ships(grid, grid_size) {
+            if let Some(i) = ships.iter().position(|&ship_size| ship_size == sunken_size) {
+                ships.remove(i);
+            }
+        }
+
+        ships
+    };
 
     for i in 0..n {
         for j in 0..n {
             match grid[i][j] {
                 CellState::EMPTY => {}
-                CellState::MISS => mask[i][j] = false,
+                CellState::MISS => ship_may_be_here[i][j] = false,
                 CellState::HIT => {
-                    for (ix, iy) in std::iter::from_generator(get_diagonal_neighbours(n, i, j)) {
-                        mask[ix][iy] = false;
+                    for (ix, iy) in from_generator(get_diagonal_neighbours(n, i, j)) {
+                        ship_may_be_here[ix][iy] = false;
                     }
                 }
                 CellState::SUNK => {
-                    mask[i][j] = false;
-                    for (ix, iy) in std::iter::from_generator(get_moore_neighbors(n, i, j)) {
-                        mask[ix][iy] = false;
+                    ship_may_be_here[i][j] = false;
+                    for (ix, iy) in from_generator(get_moore_neighbors(n, i, j)) {
+                        ship_may_be_here[ix][iy] = false;
                     }
                 }
             }
@@ -123,11 +176,15 @@ pub fn calculate_chances(
 
         for i in 0..n {
             for j in 0..(n - s + 1) {
-                if mask[i][j..(j + s)].iter().all(|b| *b) {
+                if ship_may_be_here[i][j..(j + s)].iter().all(|b| *b) {
                     chances[i][j..(j + s)].iter_mut().for_each(|x| *x += 1);
                 }
 
-                if mask[j..(j + s)].iter().map(|row| row[i]).all(|x| x) {
+                if ship_may_be_here[j..(j + s)]
+                    .iter()
+                    .map(|row| row[i])
+                    .all(|x| x)
+                {
                     chances[j..(j + s)].iter_mut().for_each(|row| row[i] += 1);
                 }
             }
