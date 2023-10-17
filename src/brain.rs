@@ -5,8 +5,6 @@ use std::{
     ops::Generator,
 };
 
-use log::info;
-
 #[derive(Debug, Default, Clone, Copy, Hash, PartialEq, Eq)]
 pub enum CellState {
     #[default]
