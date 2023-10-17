@@ -151,13 +151,28 @@ pub fn display_chances(chances: Vec<Vec<usize>>) {
     let document = get_document();
     let inputs = get_inputs();
 
-    let max_cell_chance = chances
-        .iter()
-        .map(|row| row.iter().max())
-        .max()
-        .flatten()
-        .copied()
-        .unwrap_or_default();
+    let max_cell_chance = {
+        let cells = &GRID.lock().unwrap().cells;
+        chances
+            .iter()
+            .enumerate()
+            .map(|(i, row)| {
+                row.iter()
+                    .enumerate()
+                    .filter_map(|(j, chance)| {
+                        if cells[i][j] == CellState::EMPTY {
+                            Some(chance)
+                        } else {
+                            None
+                        }
+                    })
+                    .max()
+            })
+            .max()
+            .flatten()
+            .copied()
+            .unwrap_or_default()
+    };
 
     let cells = &mut GRID.lock().unwrap().cells;
     for (i, row) in chances.iter().enumerate() {
