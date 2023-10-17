@@ -28,6 +28,7 @@ jobs:
         with:
           toolchain: nightly
           target: wasm32-unknown-unknown
+          flags: ""
       - shell: bash
         run: | 
           cargo install trunk
