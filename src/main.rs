@@ -153,25 +153,30 @@ pub fn display_chances(chances: Vec<Vec<usize>>) {
 
     let max_cell_chance = {
         let cells = &GRID.lock().unwrap().cells;
-        chances
-            .iter()
-            .enumerate()
-            .map(|(i, row)| {
-                row.iter()
-                    .enumerate()
-                    .filter_map(|(j, chance)| {
-                        if cells[i][j] == CellState::EMPTY {
-                            Some(chance)
-                        } else {
-                            None
-                        }
-                    })
-                    .max()
-            })
-            .max()
-            .flatten()
-            .copied()
-            .unwrap_or_default()
+
+        if chances.iter().all(|row| row.iter().all(|&c| c == 0)) {
+            0
+        } else {
+            chances
+                .iter()
+                .enumerate()
+                .map(|(i, row)| {
+                    row.iter()
+                        .enumerate()
+                        .filter_map(|(j, chance)| {
+                            if cells[i][j] == CellState::EMPTY {
+                                Some(chance)
+                            } else {
+                                None
+                            }
+                        })
+                        .max()
+                })
+                .max()
+                .flatten()
+                .copied()
+                .unwrap_or_default()
+        }
     };
 
     let cells = &mut GRID.lock().unwrap().cells;
@@ -193,7 +198,7 @@ pub fn display_chances(chances: Vec<Vec<usize>>) {
                 continue;
             }
 
-            if *chance == max_cell_chance {
+            if max_cell_chance != 0 && *chance == max_cell_chance {
                 cell.set_class_name("top-guess");
             } else {
                 cell.set_class_name("");
