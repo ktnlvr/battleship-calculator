@@ -5,6 +5,11 @@
     <meta charset="UTF-8">
     <base href="./">
     <meta name="viewport" content="width=device-width, initial-scale=0.5">
+
+    <meta name="description" content="Calculates the best position for you to shoot at in a game of Battleships.">
+    <meta property="og:title" content="Battleships Calculator">
+    <meta property="og:type" content="website">
+
     <title>Battleships Calculator</title>
     <!-- https://lospec.com/palette-list/microsoft-windows -->
     <style>
@@ -113,12 +118,12 @@
 <body>
     <main>
         <h1>Battleships Calculator</h1>
-        This calculator uses the possible placements of the ships to determine where most ships would overlap thus
+        <p>This calculator uses the possible placements of the ships to determine where most ships would overlap thus
         giving a heatmap of viable strike options. Click on a cell to mark it as a <b
             style="color: var(--miss-color)">MISS</b>, <b style="color: var(--hit-color)">HIT</b> or
         <b style="color: var(--sunk-color)"">SUNK</b>. A miss constitutes a cell that has no ships going through it, a hit is a cell that can't have
         neighbours on the diagonals and a sunken cell doesn't have neighbours at all. All of the above is accounted when
-        calculating the chances.
+        calculating the chances.<p>
         <div class=" board-config">
             Grid Size: <input id="grid-size" placeholder="10"><br>
             Ships: <input id="ships" placeholder="4 3 3 2 2 2">
