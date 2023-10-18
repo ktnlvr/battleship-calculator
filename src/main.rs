@@ -3,7 +3,7 @@
 #![feature(iter_from_generator)]
 #![feature(impl_trait_in_fn_trait_return)]
 
-use std::{num::NonZeroUsize, sync::Mutex};
+use std::sync::Mutex;
 
 use lazy_static::lazy_static;
 use log::Level;
@@ -12,7 +12,10 @@ use wasm_bindgen::prelude::*;
 use web_sys::*;
 
 mod brain;
+mod inputs;
+
 use brain::*;
+use inputs::*;
 
 lazy_static! {
     pub static ref GRID: Mutex<GridState> = Mutex::new(GridState { cells: vec![] });
@@ -23,48 +26,6 @@ pub fn get_document() -> Document {
         .expect("Couldn't get the window")
         .document()
         .expect("Couldn't get the document")
-}
-
-#[derive(Debug)]
-pub struct Inputs {
-    pub grid_size: usize,
-    pub ships: Vec<usize>,
-}
-
-pub fn get_inputs() -> Inputs {
-    let document = get_document();
-
-    let grid_size = document
-        .get_element_by_id("grid-size")
-        .unwrap()
-        .dyn_into::<HtmlInputElement>()
-        .ok()
-        .and_then(|inp| inp.value().parse::<usize>().ok())
-        .and_then(NonZeroUsize::new)
-        .map(NonZeroUsize::get)
-        .unwrap_or(10);
-
-    let ships = document
-        .get_element_by_id("ships")
-        .unwrap()
-        .dyn_into::<HtmlInputElement>()
-        .ok()
-        .and_then(|inp| {
-            inp.value()
-                .split_ascii_whitespace()
-                .map(|s| s.parse::<usize>())
-                .collect::<Result<Vec<usize>, _>>()
-                .ok()
-        })
-        .unwrap_or_default();
-
-    let ships = if ships.is_empty() {
-        vec![4, 3, 3, 2, 2, 2]
-    } else {
-        ships
-    };
-
-    Inputs { grid_size, ships }
 }
 
 fn name_from_number(n: usize) -> String {
@@ -86,7 +47,7 @@ pub fn setup_cell(cell: &Element, x: usize, y: usize) -> Result<(), JsValue> {
 
     let cell_click_closure = Closure::wrap(Box::new(move || {
         {
-            let cells = &mut GRID.lock().unwrap().cells;
+            let cells = &mut GRID.lock().expect("Attempt to use locked mutex").cells;
 
             let new_value = match cells[x][y] {
                 CellState::EMPTY => CellState::MISS,
@@ -142,7 +103,11 @@ pub fn setup_cell(cell: &Element, x: usize, y: usize) -> Result<(), JsValue> {
 pub fn refresh() {
     let inputs = get_inputs();
 
-    let chances = calculate_chances(&GRID.lock().unwrap().cells, inputs.grid_size, &inputs.ships);
+    let chances = calculate_chances(
+        &GRID.lock().expect("Attempt to use locked mutex").cells,
+        inputs.grid_size,
+        &inputs.ships,
+    );
 
     display_chances(chances);
 }
@@ -152,7 +117,7 @@ pub fn display_chances(chances: Vec<Vec<usize>>) {
     let inputs = get_inputs();
 
     let max_cell_chance = {
-        let cells = &GRID.lock().unwrap().cells;
+        let cells = &GRID.lock().expect("Attempt to use locked mutex").cells;
 
         if chances.iter().all(|row| row.iter().all(|&c| c == 0)) {
             0
@@ -179,7 +144,7 @@ pub fn display_chances(chances: Vec<Vec<usize>>) {
         }
     };
 
-    let cells = &mut GRID.lock().unwrap().cells;
+    let cells = &mut GRID.lock().expect("Attempt to use locked mutex").cells;
     for (i, row) in chances.iter().enumerate() {
         for (j, chance) in row.iter().enumerate().take(inputs.grid_size) {
             let cell = document
@@ -220,7 +185,8 @@ pub fn regenerate_grid() -> Result<(), JsValue> {
         .expect("Couldn't get grid");
     let inputs = get_inputs();
 
-    GRID.lock().unwrap().cells = vec![vec![CellState::EMPTY; inputs.grid_size]; inputs.grid_size];
+    GRID.lock().expect("Attempt to use locked mutex").cells =
+        vec![vec![CellState::EMPTY; inputs.grid_size]; inputs.grid_size];
 
     let grid_header_row = document.create_element("tr")?;
     grid_header_row.append_child(document.create_element("th")?.as_ref())?;
@@ -253,11 +219,11 @@ pub fn regenerate_grid() -> Result<(), JsValue> {
 
 #[wasm_bindgen(start)]
 pub fn start() -> Result<(), JsValue> {
-    console_log::init_with_level(Level::Debug).unwrap();
+    console_log::init_with_level(Level::Debug).expect("Failed to initialize the console logger");
     console_error_panic_hook::set_once();
 
     let document = get_document();
-    let url = Url::parse(&document.url()?).unwrap();
+    let url = Url::parse(&document.url()?).expect("Failed to parse the URL");
 
     let grid_size_query_param =
         url.query_pairs()
@@ -277,12 +243,18 @@ pub fn start() -> Result<(), JsValue> {
             .get_element_by_id("grid")
             .expect("Couldn't get grid");
 
-        let grid_parent = grid.parent_element().unwrap();
+        let grid_parent = grid
+            .parent_element()
+            .expect("Failed to get the grid parent element");
         grid.remove();
 
-        let new_grid = document.create_element("table").unwrap();
+        let new_grid = document
+            .create_element("table")
+            .expect("Failed to instantiate a table");
         new_grid.set_id("grid");
-        grid_parent.append_child(&new_grid).unwrap();
+        grid_parent
+            .append_child(&new_grid)
+            .expect("Failed to attach the table");
 
         let inputs = get_inputs();
         let ships_str = inputs
@@ -291,12 +263,11 @@ pub fn start() -> Result<(), JsValue> {
             .map(|x| format!("{x}"))
             .collect::<Vec<_>>()
             .join(" ");
-        let url = window().unwrap().origin();
+        let url = window().expect("Failed to get the window").origin();
 
         window()
-            .unwrap()
-            .history()
-            .unwrap()
+            .expect("Failed to get the window")
+            .history()?
             .replace_state_with_url(
                 &JsValue::UNDEFINED,
                 "!!!",
@@ -304,16 +275,19 @@ pub fn start() -> Result<(), JsValue> {
                     "{}?n={}&ships={}",
                     url, inputs.grid_size, ships_str
                 )),
-            )
-            .unwrap();
-        regenerate_grid().unwrap();
+            )?;
+        regenerate_grid()?;
 
         refresh();
-    }) as Box<dyn FnMut()>);
+        Ok(())
+    })
+        as Box<dyn FnMut() -> Result<(), JsValue>>);
 
     // Ships input
     {
-        let ships_input = document.get_element_by_id("ships").unwrap();
+        let ships_input = document
+            .get_element_by_id("ships")
+            .expect("Couldn't get ships input");
 
         ships_input.add_event_listener_with_callback(
             "change",
@@ -329,7 +303,9 @@ pub fn start() -> Result<(), JsValue> {
 
     // Grid size input
     {
-        let grid_size_input = document.get_element_by_id("grid-size").unwrap();
+        let grid_size_input = document
+            .get_element_by_id("grid-size")
+            .expect("Couldn't get grid-size input");
 
         grid_size_input.add_event_listener_with_callback(
             "change",
