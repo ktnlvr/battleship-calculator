@@ -34,7 +34,7 @@ jobs:
           cargo install trunk
       - shell: bash
         run: | 
-          trunk build --config .github/Trunk.toml
+          trunk build --config GithubTrunk.toml
       - uses: actions/upload-pages-artifact@v1
         with:
           path: 'dist'
