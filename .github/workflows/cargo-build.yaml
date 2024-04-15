@@ -26,7 +26,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
-          toolchain: nightly
+          toolchain: nightly-2024-02-04
           target: wasm32-unknown-unknown
           flags: ""
       - shell: bash
@@ -34,7 +34,7 @@ jobs:
           cargo install trunk
       - shell: bash
         run: | 
-          trunk build --config GithubPagesTrunk.toml
+          trunk build --config .github/Trunk.toml
       - uses: actions/upload-pages-artifact@v1
         with:
           path: 'dist'
