@@ -1,9 +1,9 @@
-#![feature(generators)]
-#![feature(generator_trait)]
-#![feature(iter_from_generator)]
+#![feature(coroutines)]
+#![feature(coroutine_trait)]
+#![feature(iter_from_coroutine)]
 #![feature(impl_trait_in_fn_trait_return)]
 
-use std::sync::Mutex;
+use std::{iter::from_coroutine, sync::Mutex};
 
 use lazy_static::lazy_static;
 use log::Level;
@@ -58,7 +58,7 @@ pub fn setup_cell(cell: &Element, x: usize, y: usize) -> Result<(), JsValue> {
                     let mut near_queue = vec![(x, y)];
                     while let Some((x, y)) = near_queue.pop() {
                         for (x, y) in
-                            std::iter::from_generator(get_neumann_neighbors(grid_size, x, y))
+                            from_coroutine(get_neumann_neighbors(grid_size, x, y))
                         {
                             if cells[x][y] == CellState::HIT {
                                 cells[x][y] = CellState::SUNK;
@@ -75,7 +75,7 @@ pub fn setup_cell(cell: &Element, x: usize, y: usize) -> Result<(), JsValue> {
                     let mut near_queue = vec![(x, y)];
                     while let Some((x, y)) = near_queue.pop() {
                         for (x, y) in
-                            std::iter::from_generator(get_neumann_neighbors(grid_size, x, y))
+                            std::iter::from_coroutine(get_neumann_neighbors(grid_size, x, y))
                         {
                             if cells[x][y] == CellState::SUNK {
                                 cells[x][y] = CellState::HIT;

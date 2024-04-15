@@ -1,8 +1,5 @@
 use std::{
-    collections::HashSet,
-    fmt::{Display, Write},
-    iter::from_generator,
-    ops::Generator,
+    collections::HashSet, fmt::{Display, Write}, iter::from_coroutine, ops::Coroutine
 };
 
 #[derive(Debug, Default, Clone, Copy, Hash, PartialEq, Eq)]
@@ -36,7 +33,7 @@ fn neighbors(
     grid_size: usize,
     i: usize,
     j: usize,
-) -> impl Generator<Yield = (usize, usize), Return = ()> {
+) -> impl Coroutine<Yield = (usize, usize), Return = ()> {
     let n = grid_size;
     move || {
         for (x, y) in neighborhood {
@@ -56,7 +53,7 @@ pub fn get_diagonal_neighbours(
     n: usize,
     i: usize,
     j: usize,
-) -> impl Generator<Yield = (usize, usize), Return = ()> {
+) -> impl Coroutine<Yield = (usize, usize), Return = ()> {
     neighbors(&DIAGONAL_NEIGHBORHOOD, n, i, j)
 }
 
@@ -75,7 +72,7 @@ pub fn get_moore_neighbors(
     n: usize,
     i: usize,
     j: usize,
-) -> impl Generator<Yield = (usize, usize), Return = ()> {
+) -> impl Coroutine<Yield = (usize, usize), Return = ()> {
     neighbors(&MOORE_NEIGHBORHOOD, n, i, j)
 }
 
@@ -85,7 +82,7 @@ pub fn get_neumann_neighbors(
     n: usize,
     i: usize,
     j: usize,
-) -> impl Generator<Yield = (usize, usize), Return = ()> {
+) -> impl Coroutine<Yield = (usize, usize), Return = ()> {
     neighbors(&NEUMANN_NEIGHBORHOOD, n, i, j)
 }
 
@@ -110,7 +107,7 @@ pub fn extract_sunken_ships(grid: &Vec<Vec<CellState>>, grid_size: usize) -> Vec
                 }
 
                 sunken.extend(
-                    from_generator(get_neumann_neighbors(n, i, j))
+                    from_coroutine(get_neumann_neighbors(n, i, j))
                         .filter(|&(x, y)| grid[x][y] == CellState::SUNK),
                 );
                 this_connectedness.push((i, j));
@@ -122,7 +119,7 @@ pub fn extract_sunken_ships(grid: &Vec<Vec<CellState>>, grid_size: usize) -> Vec
             visited.insert((x, y));
         }
 
-        near_queue.extend(from_generator(get_neumann_neighbors(n, x, y)))
+        near_queue.extend(from_coroutine(get_neumann_neighbors(n, x, y)))
     }
 
     sunk
@@ -153,13 +150,13 @@ pub fn calculate_chances(
                 CellState::EMPTY => {}
                 CellState::MISS => ship_may_be_here[i][j] = false,
                 CellState::HIT => {
-                    for (ix, iy) in from_generator(get_diagonal_neighbours(n, i, j)) {
+                    for (ix, iy) in from_coroutine(get_diagonal_neighbours(n, i, j)) {
                         ship_may_be_here[ix][iy] = false;
                     }
                 }
                 CellState::SUNK => {
                     ship_may_be_here[i][j] = false;
-                    for (ix, iy) in from_generator(get_moore_neighbors(n, i, j)) {
+                    for (ix, iy) in from_coroutine(get_moore_neighbors(n, i, j)) {
                         ship_may_be_here[ix][iy] = false;
                     }
                 }
