@@ -1,6 +1,8 @@
-use log::{info, Level};
+use log::Level;
 use wasm_bindgen::prelude::*;
 use web_sys::*;
+
+mod battlemap;
 
 fn get_document() -> Document {
     window().unwrap().document().unwrap()
@@ -21,22 +23,25 @@ fn start() -> Result<(), JsValue> {
 
     let grid_size = 10u32;
 
-    let grid_side = 100.;
-
     for i in 0..grid_size {
         for j in 0..grid_size {
-            let iF = i as f32;
-            let jF = j as f32;
+            let i_f: f32 = i as f32;
+            let j_f = j as f32;
 
-            let ip = grid_side * iF / (grid_size as f32);
-            let jp = grid_side * jF / (grid_size as f32);
-
+            let ip = i_f / (grid_size as f32);
+            let jp = j_f / (grid_size as f32);
 
             let cell = document.create_element_ns(Some("http://www.w3.org/2000/svg"), "rect")?;
             cell.set_attribute("x", format!("{ip}").as_str())?;
             cell.set_attribute("y", format!("{jp}").as_str())?;
-            cell.set_attribute("width", format!("{}", grid_side / (grid_size as f32)).as_str())?;
-            cell.set_attribute("height", format!("{}", grid_side / (grid_size as f32)).as_str())?;
+            cell.set_attribute(
+                "width",
+                format!("{}", 1. / (grid_size as f32)).as_str(),
+            )?;
+            cell.set_attribute(
+                "height",
+                format!("{}", 1. / (grid_size as f32)).as_str(),
+            )?;
             grid_div.append_child(&cell)?;
         }
     }
