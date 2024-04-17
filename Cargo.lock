@@ -6,6 +6,7 @@ version = 3
 name = "battleships"
 version = "0.0.0"
 dependencies = [
+ "colorous",
  "console_error_panic_hook",
  "console_log",
  "lazy_static",
@@ -26,6 +27,12 @@ name = "cfg-if"
 version = "1.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "baf1de4339761588bc0619e3cbc0120ee582ebb74b53b4efbf79117bd2da40fd"
+
+[[package]]
+name = "colorous"
+version = "1.0.13"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f51b75d5c2da6c9c4b0f3eabea722d6878f6c842cb02cf74fb317e94fd8cb042"
 
 [[package]]
 name = "console_error_panic_hook"
